@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Draw a polygon and calculate its area</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.12.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.12.0/mapbox-gl.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <style>
+        .calculation-box {
+            height: 75px;
+            width: 150px;
+            position: absolute;
+            bottom: 40px;
+            left: 10px;
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            text-align: center;
+        }
+
+        p {
+            font-family: 'Open Sans';
+            margin: 0;
+            font-size: 13px;
+        }
+    </style>
+
+    <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.2.2/mapbox-gl-draw.js"></script>
+    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.2.2/mapbox-gl-draw.css"
+        type="text/css">
+    <div id="map"></div>
+    <div class="calculation-box">
+        <p>Click the map to draw a polygon.</p>
+        <div id="calculated-area"></div>
+    </div>
+
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1Ijoic3VqYW5jaGFrcmFib3J0eSIsImEiOiJja2Q5MzBuc3owenplMnBzY2I0eDYwdDhvIn0.imItePLDlYNF2BGVde_mkw';
+        const map = new mapboxgl.Map({
+            container: 'map', // container ID
+            // Choose from Mapbox's core styles, or make your own style with Mapbox Studio
+            style: 'mapbox://styles/mapbox/dark-v9', // style URL
+            center: [-91.874, 42.76], // starting position [lng, lat]
+            zoom: 12 // starting zoom
+        });
+
+
+
+        const draw = new MapboxDraw({
+            displayControlsDefault: false,
+            // Select which mapbox-gl-draw control buttons to add to the map.
+            controls: {
+                polygon: true,
+                trash: true
+            },
+            // Set mapbox-gl-draw to draw by default.
+            // The user does not have to click the polygon control button first.
+
+        });
+        map.addControl(draw);
+
+        map.on('draw.create', updateArea);
+        map.on('draw.delete', updateArea);
+        map.on('draw.update', updateArea);
+
+        const poly1 = { "type": "FeatureCollection", "features": [{ "id": "b549fe2458ca955ce92e96301f8f6b0e", "type": "Feature", "properties": {}, "geometry": { "coordinates": [[[-91.934510635376, 42.780855194377864], [-91.93107740783715, 42.76485213724442], [-91.85073988342316, 42.74934916144221], [-91.83786528015202, 42.783122988608795], [-91.90721647644075, 42.790303819664956], [-91.934510635376, 42.780855194377864]]], "type": "Polygon" } }] }
+        const poly = { "type": "FeatureCollection", "features": [{ "type": "Feature", "properties": {}, "geometry": { "coordinates": [[[-91.89687980030837, 42.79547525069046], [-91.91507590626601, 42.79006205045113], [-91.92949546192892, 42.77570831992904], [-91.92142737721288, 42.76122544604803], [-91.85568106983979, 42.7514002814907], [-91.8388582548984, 42.75656497071435], [-91.8393732390292, 42.77835269372761], [-91.89687980030837, 42.79547525069046]]], "type": "Polygon" } }] }
+        map.on('load', () => {
+
+
+            map.addSource('maine', {
+                'type': 'geojson',
+                'data': { type: 'FeatureCollection', features: Array(0) }
+            });
+            // Add a new layer to visualize the polygon.
+            map.addLayer({
+                'id': 'maine',
+                'type': 'fill',
+                'source': 'maine', // reference the data source
+                'layout': {},
+                'paint': {
+                    'fill-color': '#0080ff', // blue color fill
+                    'fill-opacity': 0.1
+                }
+            });
+            // Add a black outline around the polygon.
+            map.addLayer({
+                'id': 'outline',
+                'type': 'line',
+                'source': 'maine',
+                'layout': {},
+                'paint': {
+                    'line-color': '#FFF',
+                    'line-width': 1
+                }
+            });
+            map.getSource("maine").setData(poly)
+
+            map.addSource('longest', {
+                'type': 'geojson',
+                'data': { type: 'FeatureCollection', features: Array(0) }
+            });
+            // Add a black outline around the polygon.
+            map.addLayer({
+                'id': 'longest',
+                'type': 'line',
+                'source': 'longest',
+                'layout': {},
+                'paint': {
+                    'line-color': 'red',
+                    'line-width': 2
+                }
+            });
+
+            map.addSource('guides', {
+                'type': 'geojson',
+                'data': { type: 'FeatureCollection', features: Array(0) }
+            });
+            // Add a black outline around the polygon.
+            map.addLayer({
+                'id': 'guides',
+                'type': 'line',
+                'source': 'guides',
+                'layout': {},
+                'paint': {
+                    'line-color': 'blue',
+                    'line-width': 2
+                }
+            });
+
+            map.addSource('points', {
+                'type': 'geojson',
+                'data': { type: 'FeatureCollection', features: Array(0) }
+            });
+            // Add a layer showing the places.
+            map.addLayer({
+                'id': 'points',
+                'type': 'circle',
+                'source': 'points',
+                'paint': {
+                    'circle-color': '#4264fb',
+                    'circle-radius': 3,
+                    'circle-stroke-width': 1,
+                    'circle-stroke-color': '#ffffff'
+                }
+            });
+
+            map.addLayer({
+                'id': "pointNumbers",
+                'type': 'symbol',
+                'source': 'points',
+                'layout': {
+                    'text-field': ['get', 'number'],
+                    'text-font': [
+                        'Open Sans Bold',
+                        'Arial Unicode MS Bold'
+                    ],
+                    'text-size': 11,
+                    'text-transform': 'uppercase',
+                    'text-letter-spacing': 0.05,
+                    'text-offset': [0, 1.5]
+                },
+                'paint': {
+                    'text-color': '#fff',
+                    'text-halo-color': '#000',
+                    'text-halo-width': 1
+                },
+            });
+
+            map.addSource('finalPolygons', {
+                'type': 'geojson',
+                'data': { type: 'FeatureCollection', features: Array(0) }
+            });
+            // Add a new layer to visualize the polygon.
+            map.addLayer({
+                'id': 'maine_f',
+                'type': 'fill',
+                'source': 'finalPolygons', // reference the data source
+                'layout': {},
+                'paint': {
+                    'fill-color': 'red', // blue color fill
+                    'fill-opacity': 0.1
+                }
+            });
+            // Add a black outline around the polygon.
+            map.addLayer({
+                'id': 'outline_f',
+                'type': 'line',
+                'source': 'finalPolygons',
+                'layout': {},
+                'paint': {
+                    'line-color': 'green',
+                    'line-width': 1
+                }
+            });
+
+            calc(poly)
+
+        });
+
+        function calc(poly) {
+
+            const splitNumber = 5
+
+            //1).get longest lines
+            const lines = []
+            // Iterate over GeoJSON by 2-vertex segments
+            turf.segmentEach(poly, function (currentSegment, featureIndex, multiFeatureIndex, geometryIndex, segmentIndex) {
+                //=currentSegment
+                //=featureIndex
+                //=multiFeatureIndex
+                //=geometryIndex
+                //=segmentIndex
+                console.log('currentSegment', currentSegment);
+                const length = turf.length(currentSegment)
+                console.log('length', length);
+                lines.push({
+                    line: currentSegment,
+                    length
+                })
+            });
+
+            console.log('lines', lines);
+            const longest = lines.sort((a, b) => b.length - a.length).splice(0, 2).map(d => d.line)
+            console.log('longest', longest);
+            map.getSource("longest").setData(turf.featureCollection(longest))
+
+
+            //2). find guide lines 
+            const gl1 = [
+                longest[0].geometry.coordinates[0],
+                longest[1].geometry.coordinates[1]
+            ]
+            const gl2 = [
+                longest[0].geometry.coordinates[1],
+                longest[1].geometry.coordinates[0]
+            ]
+
+            const line1 = turf.lineString(gl1)
+            const line2 = turf.lineString(gl2)
+            console.log('line1, line2', line1, line2);
+            map.getSource("guides").setData(turf.featureCollection([line1, line2]))
+
+
+            // const line1Length = turf.length(line1);
+            // const line2Length = turf.length(line2);
+
+            // const line1Segment = line1Length / splitNumber
+            // const line2Segment = line2Length / splitNumber
+
+            const points1 = splitLine(line1, splitNumber)
+            const points2 = splitLine(line2, splitNumber)
+
+            map.getSource("points").setData(turf.featureCollection([...points1, ...points2]))
+            console.log('points1', points1);
+            //3). Draw polygons
+            const joinPoints = [...points1, ...points2]
+            const polygonsNumber = points1.length
+            console.log('joinPoints', joinPoints);
+            const polygons = [...Array(polygonsNumber - 1)].map((d, key) => {
+                const polysArr = joinPoints
+                    .filter(d => d.properties.number === key || d.properties.number === key + 1)
+                    .sort((a, b) => a.properties.number - b.properties.number)
+                    .map(d => d.geometry.coordinates)
+
+                const poly = [polysArr[0], polysArr[1], polysArr[3], polysArr[2]] // swap for polygon
+
+                console.log('poly--->', poly);
+                const polyCoords = [...poly, [...poly[0]]]
+                console.log('polyCoords', polyCoords);
+                return turf.polygon([polyCoords], { name: 'poly1' })
+            })
+
+
+
+
+
+            map.getSource("finalPolygons").setData(turf.featureCollection(polygons))
+
+            console.log('polygons', polygons);
+
+        }
+
+        function splitLine(line, splitNumber) {
+            const lineLength = turf.length(line);
+            const length = lineLength / splitNumber
+            const points = [...Array(splitNumber + 1)].map((d, key) => {
+                const along = turf.along(line, length * key);
+                along.properties.number = key
+                return along
+            })
+            return points
+        }
+
+        function updateArea(e) {
+            console.log('update', e.features[0]);
+            const poly = e.features[0]
+            calc(poly)
+        }
+    </script>
+
+</body>
+
+</html>
