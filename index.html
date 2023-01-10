@@ -185,6 +185,37 @@
                 },
             });
 
+
+
+
+
+            map.addSource('finalPolygons', {
+                'type': 'geojson',
+                'data': { type: 'FeatureCollection', features: Array(0) }
+            });
+            // Add a new layer to visualize the polygon.
+            map.addLayer({
+                'id': 'maine_f',
+                'type': 'fill',
+                'source': 'finalPolygons', // reference the data source
+                'layout': {},
+                'paint': {
+                    'fill-color': 'red', // blue color fill
+                    'fill-opacity': 0.1
+                }
+            });
+            // Add a black outline around the polygon.
+            map.addLayer({
+                'id': 'outline_f',
+                'type': 'line',
+                'source': 'finalPolygons',
+                'layout': {},
+                'paint': {
+                    'line-color': 'green',
+                    'line-width': 1
+                }
+            });
+
             calc(poly)
 
         });
@@ -243,17 +274,38 @@
             const points2 = splitLine(line2, splitNumber)
 
             map.getSource("points").setData(turf.featureCollection([...points1, ...points2]))
-
+            console.log('points1', points1);
             //3). Draw polygons
-            
+            const joinPoints = [...points1, ...points2]
+            const polygonsNumber = points1.length
+            console.log('joinPoints', joinPoints);
+            const polygons = [...Array(polygonsNumber - 1)].map((d, key) => {
+                const polysArr = joinPoints
+                    .filter(d => d.properties.number === key || d.properties.number === key + 1)
+                    .sort((a, b) => a.properties.number - b.properties.number)
+                    .map(d => d.geometry.coordinates)
+
+                const poly = [polysArr[0], polysArr[1], polysArr[3], polysArr[2]] // swap for polygon
+
+                console.log('poly--->', poly);
+                const polyCoords = [...poly, [...poly[0]]]
+                console.log('polyCoords', polyCoords);
+                return turf.polygon([polyCoords], { name: 'poly1' })
+            })
+
+
+
+
+
+            map.getSource("finalPolygons").setData(turf.featureCollection(polygons))
+
+            console.log('polygons', polygons);
 
         }
 
         function splitLine(line, splitNumber) {
-
             const lineLength = turf.length(line);
             const length = lineLength / splitNumber
-
             const points = [...Array(splitNumber + 1)].map((d, key) => {
                 const along = turf.along(line, length * key);
                 along.properties.number = key
